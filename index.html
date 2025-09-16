@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Flipbook A4 (40 pages)</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/css/page-flip.css">
+  <style>
+    :root { --book-max-w: 1100px; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background: #ffffff; color: #111;   /* <-- fond blanc */
+    }
+    .wrap { width: min(96vw, var(--book-max-w)); }
+    .toolbar {
+      display: flex; gap: .5rem; align-items: center; justify-content: space-between;
+      margin-bottom: .5rem; flex-wrap: wrap;
+    }
+    .btn {
+      border: 1px solid #ddd; border-radius: 10px; padding: .6rem .9rem; cursor: pointer;
+      background: #fff; color: #111; font-weight: 600;
+      box-shadow: 0 2px 6px rgba(0,0,0,.06);
+    }
+    .btn:active { transform: translateY(1px); }
+    #book {
+      width: 100%;
+      /* A4 en livret = 2 pages A4 portrait côte à côte => ratio 420:297 (~1.414) */
+      aspect-ratio: 420 / 297;
+      border-radius: 14px; overflow: hidden;
+      background: #ffffff;                 /* <-- fond du livre blanc */
+      box-shadow: 0 10px 30px rgba(0,0,0,.15);
+      position: relative;                   /* pour les zones de clic */
+      user-select: none; -webkit-user-drag: none;
+    }
+    /* Zones de clic fines sur les bords pour éviter tout double-saut;
+       le centre reste géré nativement (clic + drag) par PageFlip. */
+    .edge {
+      position: absolute; top: 0; bottom: 0; width: 18%;
+      z-index: 9; opacity: 0; pointer-events: auto;
+    }
+    .edge.left  { left: 0;  cursor: w-resize; }
+    .edge.right { right: 0; cursor: e-resize; }
+
+    .hint { opacity: .7; font-size: .9rem; margin-top: .4rem }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="toolbar">
+      <div>
+        <button class="btn" id="prev">◀ Précédent</button>
+        <button class="btn" id="next">Suivant ▶</button>
+        <button class="btn" id="fullscreen">⛶ Plein écran</button>
+      </div>
+      <div><strong id="status">Page 1/40</strong></div>
+    </div>
+
+    <div id="book">
+      <div class="edge left"  id="edgeLeft"  aria-label="Page précédente"></div>
+      <div class="edge right" id="edgeRight" aria-label="Page suivante"></div>
+    </div>
+
+    <div class="hint">Bords : clic = tourne d’1 page • Centre : clic/drag natif • Flèches ← →</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.min.js"></script>
+  <script>
+    (function () {
+      // ===== CONFIG =====
+      const imageCount = 40;
+      const baseURL    = 'https://ingenieur-ova.github.io/flipbook-studio10/images';
+      const ext        = 'jpg'; // fichiers: 01.jpg, 02.jpg, ...
+
+      const urls = Array.from({ length: imageCount }, (_, i) => {
+        const n = String(i + 1).padStart(2, '0');
+        return `${baseURL}/${n}.${ext}`;
+      });
+
+      // ===== INIT =====
+      const bookEl = document.getElementById('book');
+      const status = document.getElementById('status');
+
+      // Dimensions d'UNE page A4 en base pixels (spread = 2x width)
+      const pageWidth  = 595;  // A4 @72dpi ≈ 595x842 ; sert juste de base, le conteneur est responsive
+      const pageHeight = 842;
+
+      const pageFlip = new St.PageFlip(bookEl, {
+        width: pageWidth, height: pageHeight,
+        size: 'stretch',
+        showCover: true,
+        usePortrait: true,
+        mobileScrollSupport: false,
+        maxShadowOpacity: 0.2,
+        flippingTime: 600
+      });
+
+      pageFlip.loadFromImages(urls);
+
+      const update = () => {
+        status.textContent = `Page ${pageFlip.getCurrentPageIndex() + 1}/${pageFlip.getPageCount()}`;
+      };
+      pageFlip.on('init', update);
+      pageFlip.on('flip', update);
+
+      // Boutons
+      document.getElementById('prev').onclick = () => pageFlip.flipPrev();
+      document.getElementById('next').onclick = () => pageFlip.flipNext();
+
+      // Plein écran
+      document.getElementById('fullscreen').onclick = () => {
+        if (!document.fullscreenElement) bookEl.requestFullscreen?.();
+        else document.exitFullscreen?.();
+      };
+
+      // Clavier
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft')  pageFlip.flipPrev();
+        if (e.key === 'ArrowRight') pageFlip.flipNext();
+      });
+
+      // Clic bords (1 page) — on bloque la propagation pour éviter le handler interne
+      const stop = (e) => { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation?.(); };
+      const L = document.getElementById('edgeLeft');
+      const R = document.getElementById('edgeRight');
+      const goPrev = (e) => { stop(e); pageFlip.flipPrev(); };
+      const goNext = (e) => { stop(e); pageFlip.flipNext(); };
+      L.addEventListener('click', goPrev); R.addEventListener('click', goNext);
+      L.addEventListener('touchend', goPrev, { passive: false });
+      R.addEventListener('touchend', goNext, { passive: false });
+
+      // Important : pas de handler global sur #book → centre = clic/drag natif PageFlip (1 page).
+    })();
+  </script>
+</body>
+</html>
