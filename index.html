@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Flipbook A4 (40 pages)</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/css/page-flip.css">
+  <style>
+    :root { --book-max-w: 1100px; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background: #ffffff; color: #111;
+    }
+    .wrap { width: min(96vw, var(--book-max-w)); }
+    .toolbar {
+      display: flex; gap: .5rem; align-items: center; justify-content: space-between;
+      margin-bottom: .5rem; flex-wrap: wrap;
+    }
+    .btn {
+      border: 1px solid #ddd; border-radius: 10px; padding: .6rem .9rem; cursor: pointer;
+      background: #fff; color: #111; font-weight: 600;
+      box-shadow: 0 2px 6px rgba(0,0,0,.06);
+    }
+    .btn:active { transform: translateY(1px); }
+    #book {
+      width: 100%;
+      /* A4 livret (2 pages portrait côte à côte) => ratio 420:297 (~1.414) */
+      aspect-ratio: 420 / 297;
+      border-radius: 14px; overflow: hidden;
+      background: #ffffff;
+      box-shadow: 0 10px 30px rgba(0,0,0,.15);
+      user-select: none; -webkit-user-drag: none;
+    }
+    .hint { opacity: .7; font-size: .9rem; margin-top: .4rem }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="toolbar">
+      <div>
+        <button class="btn" id="prev">◀ Précédent</button>
+        <button class="btn" id="next">Suivant ▶</button>
+        <button class="btn" id="fullscreen">⛶ Plein écran</button>
+      </div>
+      <div><strong id="status">Page 1/40</strong></div>
+    </div>
+
+    <div id="book"></div>
+
+    <div class="hint">Drag au centre pour tourner la page • Clic gauche/droite (1 page) • Flèches ← →</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.min.js"></script>
+  <script>
+    (function () {
+      // ===== CONFIG =====
+      const imageCount = 40;
+      const baseURL    = 'https://ingenieur-ova.github.io/flipbook-studio10/images';
+      const ext        = 'jpg'; // 01.jpg, 02.jpg, ...
+
+      const urls = Array.from({ length: imageCount }, (_, i) => {
+        const n = String(i + 1).padStart(2, '0');
+        return `${baseURL}/${n}.${ext}`;
+      });
+
+      // ===== INIT =====
+      const bookEl = document.getElementById('book');
+      const status = document.getElementById('status');
+
+      // Dimensions d'UNE page A4 en pixels de base; conteneur responsive
+      const pageWidth  = 595;  // ~A4 @72dpi
+      const pageHeight = 842;
+
+      const pageFlip = new St.PageFlip(bookEl, {
+        width: pageWidth, height: pageHeight,
+        size: 'stretch',
+        showCover: true,
+        usePortrait: true,
+        mobileScrollSupport: false,
+        maxShadowOpacity: 0.2,
+        flippingTime: 600
+      });
+
+      pageFlip.loadFromImages(urls);
+
+      const update = () => {
+        status.textContent = `Page ${pageFlip.getCurrentPageIndex() + 1}/${pageFlip.getPageCount()}`;
+      };
+      pageFlip.on('init', update);
+      pageFlip.on('flip', update);
+
+      // Boutons
+      document.getElementById('prev').onclick = () => pageFlip.flipPrev();
+      document.getElementById('next').onclick = () => pageFlip.flipNext();
+
+      // Plein écran
+      document.getElementById('fullscreen').onclick = () => {
+        if (!document.fullscreenElement) bookEl.requestFullscreen?.();
+        else document.exitFullscreen?.();
+      };
+
+      // Clavier
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft')  pageFlip.flipPrev();
+        if (e.key === 'ArrowRight') pageFlip.flipNext();
+      });
+
+      // ===== CLIC SANS DOUBLES, DRAG PRÉSERVÉ =====
+      // On intercepte SEULEMENT le "click" en capture pour empêcher le handler interne
+      // et on pilote nous-mêmes la navigation gauche/droite.
+      // Si un drag a eu lieu (déplacement > 8px), on ignore ce clic fantôme.
+      let downPt = null, suppressNextClick = false;
+
+      bookEl.addEventListener('pointerdown', (e) => {
+        downPt = { x: e.clientX, y: e.clientY };
+      }, true); // capture, mais on ne bloque pas
+
+      bookEl.addEventListener('pointerup', (e) => {
+        if (downPt) {
+          const dx = e.clientX - downPt.x;
+          const dy = e.clientY - downPt.y;
+          if (Math.hypot(dx, dy) > 8) suppressNextClick = true; // c'était un drag
+          downPt = null;
+        }
+      }, true);
+
+      bookEl.addEventListener('click', (e) => {
+        if (suppressNextClick) { suppressNextClick = false; return; }
+        // Clic = 1 page : gauche = prev, droite = next
+        const r = bookEl.getBoundingClientRect();
+        const x = e.clientX - r.left;
+        if (x < r.width / 2) pageFlip.flipPrev(); else pageFlip.flipNext();
+        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation?.();
+      }, true); // capture: notre clic remplace le clic interne, sans toucher au drag
+    })();
+  </script>
+</body>
+</html>
