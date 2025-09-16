@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Flipbook 40 images</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/css/page-flip.css">
+  <style>
+    :root { --book-max-w: 1100px; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background: #0e0e0f; color: #eaeaea;
+    }
+    .wrap { width: min(96vw, var(--book-max-w)); }
+    .toolbar {
+      display: flex; gap: .5rem; align-items: center; justify-content: space-between;
+      margin-bottom: .5rem; flex-wrap: wrap;
+    }
+    .btn {
+      border: 0; border-radius: 10px; padding: .6rem .9rem; cursor: pointer;
+      background: #fff; color: #111; font-weight: 600;
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    }
+    .btn:active { transform: translateY(1px); }
+    #book {
+      width: 100%;
+      aspect-ratio: 3 / 2;
+      border-radius: 16px; overflow: hidden;
+      background: #1b1b1d; box-shadow: 0 16px 40px rgba(0,0,0,.45);
+      position: relative; /* pour les zones de clic */
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    /* Zones de clic (bordures seulement) : n'interfèrent pas avec le drag central */
+    .edge {
+      position: absolute; top: 0; bottom: 0; width: 22%;
+      z-index: 9; opacity: 0; pointer-events: auto;
+    }
+    .edge.left  { left: 0;  cursor: w-resize; }
+    .edge.right { right: 0; cursor: e-resize; }
+
+    .hint { opacity: .75; font-size: .9rem; margin-top: .4rem }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="toolbar">
+      <div>
+        <button class="btn" id="prev">◀ Précédent</button>
+        <button class="btn" id="next">Suivant ▶</button>
+        <button class="btn" id="fullscreen">⛶ Plein écran</button>
+      </div>
+      <div><strong id="status">Page 1/40</strong></div>
+    </div>
+
+    <div id="book">
+      <!-- fines zones de clic aux bords (pour éviter tout double-saut) -->
+      <div class="edge left"  id="edgeLeft"  aria-label="Page précédente"></div>
+      <div class="edge right" id="edgeRight" aria-label="Page suivante"></div>
+    </div>
+
+    <div class="hint">Clic bords ou flèches ← → ; drag au centre ; boutons ci-dessus.</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.min.js"></script>
+  <script>
+    (function () {
+      // ===== CONFIG =====
+      const imageCount = 40;
+      const baseURL    = 'https://ingenieur-ova.github.io/flipbook-studio10/images';
+      const ext        = 'jpg'; // fichiers: 01.jpg, 02.jpg, ...
+
+      const urls = Array.from({ length: imageCount }, (_, i) => {
+        const n = String(i + 1).padStart(2, '0');
+        return `${baseURL}/${n}.${ext}`;
+      });
+
+      // ===== INIT =====
+      const bookEl = document.getElementById('book');
+      const status = document.getElementById('status');
+
+      const pageFlip = new St.PageFlip(bookEl, {
+        width: 900, height: 600,
+        size: 'stretch',
+        showCover: true,
+        usePortrait: true,
+        mobileScrollSupport: false,
+        maxShadowOpacity: 0.25,
+        flippingTime: 600
+      });
+
+      pageFlip.loadFromImages(urls);
+
+      const update = () => {
+        status.textContent = `Page ${pageFlip.getCurrentPageIndex() + 1}/${pageFlip.getPageCount()}`;
+      };
+      pageFlip.on('init', update);
+      pageFlip.on('flip', update);
+
+      // Boutons
+      document.getElementById('prev').onclick = () => pageFlip.flipPrev();
+      document.getElementById('next').onclick = () => pageFlip.flipNext();
+
+      // Plein écran
+      document.getElementById('fullscreen').onclick = () => {
+        if (!document.fullscreenElement) bookEl.requestFullscreen?.();
+        else document.exitFullscreen?.();
+      };
+
+      // Clavier
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft')  pageFlip.flipPrev();
+        if (e.key === 'ArrowRight') pageFlip.flipNext();
+      });
+
+      // Clic bords — on bloque la propagation pour éviter le handler interne
+      const stop = (e) => { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation?.(); };
+      const L = document.getElementById('edgeLeft');
+      const R = document.getElementById('edgeRight');
+
+      const goPrev = (e) => { stop(e); pageFlip.flipPrev(); };
+      const goNext = (e) => { stop(e); pageFlip.flipNext(); };
+
+      // click & tap
+      L.addEventListener('click', goPrev);
+      R.addEventListener('click', goNext);
+      L.addEventListener('touchend', goPrev, { passive: false });
+      R.addEventListener('touchend', goNext, { passive: false });
+
+      // Important : on ne met PAS de handler global sur #book.
+      // → centre : clic/drag 100% gérés par PageFlip (1 seul flip)
+      // → bords : nos zones captent le clic (1 seul flip) et laissent le drag central intact.
+    })();
+  </script>
+</body>
+</html>
